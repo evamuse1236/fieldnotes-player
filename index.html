@@ -59,6 +59,7 @@ a { color: var(--accent); font-size: .9rem; justify-self: start; }
   <audio id="audio" preload="metadata"></audio>
 </main>
 <script>
+const KEY = 'AIzaSyD0CrWBn_gZTpSYhAaEWruFI2tdz4rzPiU';
 const p = new URLSearchParams(location.search);
 const id = p.get('id') || '';
 const start = Math.max(0, parseInt(p.get('t') || '0', 10) || 0);
@@ -75,7 +76,7 @@ if (!/^[A-Za-z0-9_-]{10,}$/.test(id)) {
   $('status').textContent = 'This link has no recording id. Go back to the transcript and tap a time again.';
   $('play').disabled = true;
 } else {
-  audio.src = 'https://drive.usercontent.google.com/download?id=' + id + '&export=download&confirm=t';
+  audio.src = 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media&key=' + KEY;
 }
 let positioned = false;
 audio.addEventListener('loadedmetadata', () => {
