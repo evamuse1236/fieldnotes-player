@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Field Notes Player</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;650&display=swap">
+<style>
+:root {
+  --bg: oklch(96% 0.008 160); --card: oklch(99.5% 0.003 160); --ink: oklch(24% 0.012 160);
+  --muted: oklch(52% 0.015 160); --line: oklch(88% 0.01 160); --accent: oklch(48% 0.09 190);
+  --num: "Inter Tight", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: oklch(18% 0.008 160); --card: oklch(22% 0.01 160); --ink: oklch(93% 0.006 160);
+    --muted: oklch(70% 0.012 160); --line: oklch(32% 0.012 160); --accent: oklch(76% 0.1 190); color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-block-size: 100dvh; display: grid; place-items: center; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding-block: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom));
+  padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)); }
+main { inline-size: min(100%, 30rem); background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: 1.25rem; display: grid; gap: 1rem; }
+h1 { font-size: 1rem; line-height: 1.35; margin: 0; overflow-wrap: anywhere; color: var(--muted); font-weight: 500; }
+.time { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: clamp(2.4rem, 11vw, 3.2rem); font-weight: 650; letter-spacing: -.02em; line-height: 1; }
+.time small { font-size: 1rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+input[type=range] { inline-size: 100%; accent-color: var(--accent); margin: 0; }
+.row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.row button:not(.play) { flex: 1 1 0; }
+button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: .6rem; padding: .6rem .7rem; cursor: pointer; min-block-size: 44px; font-variant-numeric: tabular-nums; }
+button.play { flex: 1 1 100%; background: var(--accent); border-color: var(--accent); color: var(--card); font-weight: 600; font-size: 1.05rem; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:active { background: color-mix(in oklch, var(--bg), var(--ink) 10%); }
+button.play:active { background: color-mix(in oklch, var(--accent), var(--ink) 18%); }
+@media (hover: hover) and (pointer: fine) {
+  button:hover { background: color-mix(in oklch, var(--bg), var(--ink) 6%); }
+  button.play:hover { background: color-mix(in oklch, var(--accent), var(--ink) 12%); }
+}
+.status { font-size: .9rem; color: var(--muted); min-block-size: 1.35em; margin: 0; }
+a { color: var(--accent); font-size: .9rem; justify-self: start; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="name">Recording</h1>
+  <div class="time"><span id="now">0:00:00</span> <small>/ <span id="dur">…</span></small></div>
+  <input id="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Position">
+  <div class="row">
+    <button class="play" id="play">Play from <span id="from">0:00:00</span></button>
+    <button id="back" aria-label="Back 15 seconds">−15 s</button>
+    <button id="restart">Quote start</button>
+    <button id="fwd" aria-label="Forward 15 seconds">+15 s</button>
+    <button id="speed" aria-label="Playback speed">1×</button>
+  </div>
+  <p class="status" id="status" aria-live="polite">Loading…</p>
+  <a id="drive" target="_blank" rel="noopener">Open in Google Drive</a>
+  <audio id="audio" preload="metadata"></audio>
+</main>
+<script>
+const p = new URLSearchParams(location.search);
+const id = p.get('id') || '';
+const start = Math.max(0, parseInt(p.get('t') || '0', 10) || 0);
+const $ = s => document.getElementById(s);
+const audio = $('audio');
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 3600) + ':' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const name = p.get('n') || 'Recording';
+$('name').textContent = name;
+document.title = name + ' · ' + fmt(start);
+$('from').textContent = fmt(start);
+$('now').textContent = fmt(start);
+$('drive').href = 'https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view';
+if (!/^[A-Za-z0-9_-]{10,}$/.test(id)) {
+  $('status').textContent = 'This link has no recording id. Go back to the transcript and tap a time again.';
+  $('play').disabled = true;
+} else {
+  audio.src = 'https://drive.usercontent.google.com/download?id=' + id + '&export=download&confirm=t';
+}
+let positioned = false;
+audio.addEventListener('loadedmetadata', () => {
+  $('dur').textContent = fmt(audio.duration);
+  $('seek').max = Math.floor(audio.duration);
+  if (!positioned) { audio.currentTime = Math.min(start, audio.duration || start); positioned = true; }
+  $('status').textContent = '';
+});
+audio.addEventListener('timeupdate', () => { $('now').textContent = fmt(audio.currentTime); $('seek').value = Math.floor(audio.currentTime); });
+audio.addEventListener('waiting', () => { $('status').textContent = 'Loading…'; });
+audio.addEventListener('playing', () => { $('status').textContent = ''; $('play').textContent = 'Pause'; });
+audio.addEventListener('pause', () => { $('play').textContent = 'Play'; });
+audio.addEventListener('error', () => { $('status').textContent = 'The audio did not load. Open it in Google Drive and skip to ' + fmt(start) + '.'; });
+$('play').addEventListener('click', () => {
+  if (audio.paused) { if (!positioned) { audio.currentTime = start; positioned = true; } audio.play().catch(() => { $('status').textContent = 'Tap play again.'; }); }
+  else audio.pause();
+});
+$('back').addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
+$('fwd').addEventListener('click', () => { audio.currentTime = audio.currentTime + 15; });
+$('restart').addEventListener('click', () => { audio.currentTime = start; });
+$('seek').addEventListener('input', e => { audio.currentTime = +e.target.value; });
+const speeds = [1, 1.25, 1.5, 2, 0.75];
+$('speed').addEventListener('click', () => { const i = (speeds.indexOf(audio.playbackRate) + 1) % speeds.length; audio.playbackRate = speeds[i]; $('speed').textContent = speeds[i] + '×'; });
+</script>
+</body>
+</html>
